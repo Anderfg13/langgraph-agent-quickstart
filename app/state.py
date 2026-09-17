@@ -15,7 +15,10 @@ class MessagesState(TypedDict):
             las herramientas. El reducer agrega mensajes nuevos al historial.
         llm_calls: Cantidad de veces que el nodo del modelo fue ejecutado en el
             hilo actual.
+        halted: Indica que el flujo debe terminar después de una decisión humana
+            de rechazo.
     """
 
     messages: Annotated[list[AnyMessage], operator.add]
     llm_calls: int
+    halted: bool

@@ -4,6 +4,10 @@ Agente aritmetico construido con LangGraph y Gemini. Este proyecto funciona
 como laboratorio para entender herramientas, grafos, memoria de corto plazo y
 Human-in-the-Loop (HITL) mediante codigo ejecutable.
 
+> Nota: el modelo inicial `gemini-2.5-flash` produjo un error `404 NOT_FOUND`
+> para usuarios nuevos. Se actualizo a `gemini-3.6-flash`, que es el modelo
+> estable recomendado por la respuesta de la API y la documentacion actual.
+
 ## Que hace
 
 1. Recibe una solicitud en lenguaje natural.
@@ -103,6 +107,10 @@ agent.invoke(Command(resume="yes"), config)
 
 Con `yes` o `si`, se ejecuta la division. Con `no`, se genera un
 `ToolMessage` que informa que la operacion fue rechazada.
+
+Cuando la aprobacion es negativa, el estado incluye `halted=True`. Esto evita
+que el modelo vuelva a solicitar automaticamente la misma herramienta despues
+del rechazo.
 
 ### Manejo basico de errores
 
@@ -213,6 +221,19 @@ Conserva una captura de la terminal con el quickstart ejecutado, el prompt de
 aprobacion HITL y la respuesta `yes` o `no`. Registra tambien el primer error
 real y como se resolvio. La suite de pruebas locales aporta evidencia
 reproducible sin consumir API.
+
+### Primer error y solucion
+
+Durante la primera ejecucion, Gemini devolvio:
+
+```text
+404 NOT_FOUND: This model models/gemini-2.5-flash is no longer available to new users.
+```
+
+La causa no estaba en LangGraph ni en el grafo: el identificador del modelo
+configurado ya no estaba disponible para cuentas nuevas. Se resolvio cambiando
+el modelo en `app/config.py` a `gemini-3.6-flash` y ejecutando nuevamente el
+quickstart.
 
 ## Limitaciones y riesgos tecnicos
 

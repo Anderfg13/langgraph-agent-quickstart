@@ -75,7 +75,7 @@ def tool_node(state: MessagesState):
                         tool_call_id=tool_call["id"],
                     )
                 )
-                continue
+                return {"messages": results, "halted": True}
 
         tool = tools_by_name[tool_call["name"]]
         try:
@@ -95,10 +95,10 @@ def should_continue(state: MessagesState) -> Literal["tool_node", END]:
         state: Estado actual del grafo.
 
     Returns:
-        `tool_node` si el modelo solicito una herramienta; `END` en caso
-        contrario.
+        `tool_node` si el modelo solicito una herramienta y el flujo no esta
+        detenido; `END` en caso contrario.
     """
 
-    if state["messages"][-1].tool_calls:
+    if not state.get("halted", False) and state["messages"][-1].tool_calls:
         return "tool_node"
     return END
