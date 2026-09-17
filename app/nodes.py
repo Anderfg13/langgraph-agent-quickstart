@@ -53,7 +53,10 @@ def tool_node(state: MessagesState):
                 continue
 
         tool = tools_by_name[tool_call["name"]]
-        observation = tool.invoke(tool_call["args"])
+        try:
+            observation = tool.invoke(tool_call["args"])
+        except (TypeError, ValueError, ZeroDivisionError) as error:
+            observation = f"Error al ejecutar {tool.name}: {error}"
         results.append(
             ToolMessage(content=str(observation), tool_call_id=tool_call["id"])
         )

@@ -104,6 +104,13 @@ agent.invoke(Command(resume="yes"), config)
 Con `yes` o `si`, se ejecuta la division. Con `no`, se genera un
 `ToolMessage` que informa que la operacion fue rechazada.
 
+### Manejo basico de errores
+
+La herramienta `divide` valida el divisor y lanza un `ValueError` si es cero.
+Ademas, `tool_node` captura errores de argumentos o valores y los devuelve como
+un `ToolMessage`, de modo que el modelo pueda explicar el problema sin cerrar
+todo el flujo.
+
 ## Instalacion
 
 Requisito: Python 3.11 o superior.

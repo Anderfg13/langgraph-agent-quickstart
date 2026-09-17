@@ -16,6 +16,8 @@ def add(a: int, b: int) -> int:
 @tool
 def divide(a: int, b: int) -> float:
     """Divide dos enteros."""
+    if b == 0:
+        raise ValueError("No se puede dividir entre cero.")
     return a / b
 
 tools = [add, multiply, divide]
