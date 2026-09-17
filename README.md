@@ -1,83 +1,225 @@
-# LangGraph quickstart
+# LangGraph Agent Lab
 
-Este proyecto sigue el quickstart oficial de LangGraph con la Graph API: un
-agente decide cuando usar herramientas de suma, multiplicacion y division. Usa
-Gemini mediante la integracion oficial de LangChain, en lugar de Anthropic.
+Agente aritmetico construido con LangGraph y Gemini. Este proyecto funciona
+como laboratorio para entender herramientas, grafos, memoria de corto plazo y
+Human-in-the-Loop (HITL) mediante codigo ejecutable.
 
-## Estructura del codigo
+## Que hace
+
+1. Recibe una solicitud en lenguaje natural.
+2. Gemini decide si necesita una herramienta.
+3. LangGraph ejecuta `add`, `multiply` o `divide`.
+4. Si la herramienta es `divide`, el grafo se pausa y solicita aprobacion.
+5. El resultado queda guardado en el hilo mediante `InMemorySaver`.
+
+## Arquitectura
+
+```text
+Usuario
+  |
+  v
+START --> llm_call --(hay tool_calls)--> tool_node --+--> llm_call
+             |                                       |
+             +------------(sin tools)--------------> END
+                                                     |
+                              divide                 |
+                         interrupt(approval)         |
+                              |                      |
+                    Command(resume=yes/no) ----------+
+```
+
+### Responsabilidad de cada modulo
 
 ```text
 app/
-├── config.py                 # Configuracion de Gemini
-├── state.py                  # Estado compartido del grafo
-├── tools.py                  # Herramientas aritmeticas
-├── nodes.py                  # Nodos y decisiones del agente
-├── graph.py                  # Construccion del grafo y memoria
-├── main.py                   # Demo ejecutable
-└── langgraph_quickstart.py   # Lanzador compatible
+├── config.py                 # Carga .env y configura Gemini
+├── state.py                  # Define el estado compartido del grafo
+├── tools.py                  # Funciones expuestas como herramientas
+├── nodes.py                  # Nodos, ejecucion de tools y enrutamiento
+├── graph.py                  # Ensambla nodos, edges y checkpointer
+├── main.py                   # Demo interactivo del agente
+└── langgraph_quickstart.py   # Punto de entrada como modulo
+
+tests/
+└── test_tools.py             # Pruebas locales sin consumir API
 ```
 
-## 1. Activar el entorno
+## Conceptos importantes
 
-En PowerShell, desde esta carpeta:
+### Estado
+
+`MessagesState` es un `TypedDict` con dos datos:
+
+- `messages`: historial de mensajes del usuario, modelo y herramientas.
+- `llm_calls`: contador de llamadas al modelo.
+
+El anotador `operator.add` indica que los mensajes nuevos se agregan al
+historial en vez de reemplazarlo.
+
+### Nodos
+
+- `llm_call`: envia el historial a Gemini y permite que el modelo solicite una
+  herramienta.
+- `tool_node`: ejecuta las herramientas solicitadas. Antes de `divide`, llama a
+  `interrupt` y detiene el grafo.
+- `should_continue`: devuelve `tool_node` si Gemini pidio una herramienta o
+  `END` si ya existe una respuesta final.
+
+### Edges
+
+- `START -> llm_call`: inicia el flujo.
+- `llm_call -> tool_node`: ocurre cuando hay una llamada a herramienta.
+- `llm_call -> END`: ocurre cuando Gemini responde sin herramientas.
+- `tool_node -> llm_call`: devuelve el resultado de la herramienta al modelo.
+
+### Memoria de corto plazo
+
+`InMemorySaver` guarda checkpoints en RAM. El `thread_id` identifica la
+conversacion:
+
+```python
+config = {"configurable": {"thread_id": "demo-gemini"}}
+agent.invoke(input_data, config)
+```
+
+El mismo `thread_id` permite que la segunda solicitud recuerde el resultado de
+la primera. Esta memoria desaparece al cerrar el proceso; para produccion se
+puede cambiar por PostgreSQL o Redis.
+
+### Human-in-the-Loop
+
+Cuando el modelo pide dividir, `tool_node` ejecuta:
+
+```python
+approval = interrupt({"type": "approval", "operation": args})
+```
+
+El grafo conserva el estado gracias al checkpointer. `main.py` muestra la
+interrupcion y luego continua con:
+
+```python
+agent.invoke(Command(resume="yes"), config)
+```
+
+Con `yes` o `si`, se ejecuta la division. Con `no`, se genera un
+`ToolMessage` que informa que la operacion fue rechazada.
+
+## Instalacion
+
+Requisito: Python 3.11 o superior.
 
 ```powershell
-\.venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Si PowerShell bloquea la activacion, puedes ejecutar los comandos usando
-directamente `\.venv\Scripts\python.exe`.
+## Configurar Gemini
 
-## 2. Configurar la clave del modelo
-
-El quickstart necesita una clave de Google AI Studio. Puedes crearla gratis
-desde https://aistudio.google.com/apikey y guardarla solo en tu maquina:
+1. Crea una clave en [Google AI Studio](https://aistudio.google.com/apikey).
+2. Copia la plantilla:
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
 
-Reemplaza el valor de `GOOGLE_API_KEY` en `.env`. Tambien se acepta
-`GEMINI_API_KEY`. No publiques ese archivo.
+3. Completa el archivo `.env`:
 
-## 3. Instalar o actualizar dependencias
-
-```powershell
-\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```env
+GOOGLE_API_KEY=tu_clave_de_google_ai_studio
 ```
 
-## 4. Ejecutar el agente
+Tambien se acepta `GEMINI_API_KEY`. No compartas `.env` ni incluyas claves en
+Git. El nivel gratuito tiene limites de solicitudes y puede cambiar según la
+cuenta y el modelo.
+
+## Quickstart ejecutable
+
+Desde la raiz del repositorio:
 
 ```powershell
-\.venv\Scripts\python.exe -m app.langgraph_quickstart
+.\.venv\Scripts\python.exe -m app.langgraph_quickstart
 ```
 
-La salida debe mostrar dos respuestas. La segunda usa el resultado de la
-primera porque ambas ejecuciones comparten el mismo `thread_id`.
+El programa suma 3 y 4, intenta dividir el resultado entre 2 y solicita
+aprobacion. Escribe `yes` para aprobar o `no` para rechazar.
 
-## Que acabamos de agregar: memoria de corto plazo
+## Pruebas locales
 
-`InMemorySaver` guarda checkpoints del estado del grafo en RAM. El diccionario
-`config` identifica la conversacion mediante `thread_id`. Por eso la segunda
-llamada puede entender "ese resultado" sin que le pasemos manualmente todo el
-historial.
+Las herramientas se prueban sin API porque son funciones Python:
 
-Esta memoria se pierde al cerrar el programa. Para produccion, LangGraph ofrece
-checkpointers persistentes como PostgreSQL o Redis. Mas adelante podemos agregar
-uno de esos, o una memoria de largo plazo con `InMemoryStore`.
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
 
-## Evidencia para la ficha
+Validaciones adicionales:
 
-Captura la terminal mostrando el comando y la salida. Anota tambien:
+```powershell
+.\.venv\Scripts\python.exe -m py_compile app\*.py
+.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip show langgraph langchain-google-genai
+```
 
-- Version de Python: `\.venv\Scripts\python.exe --version`
-- Versiones instaladas: `\.venv\Scripts\python.exe -m pip show langgraph langchain`
-- Cantidad de llamadas al modelo que imprime el agente.
-- El primer error que aparezca, si ocurre, y el cambio que lo resolvio.
+## Ficha para el catalogo vivo
+
+### Madurez y adopcion
+
+LangGraph es un framework de orquestacion de agentes de LangChain. Su modelo de
+grafos explicitos es apropiado cuando se necesita controlar estados, ciclos,
+checkpoints e interrupciones.
+
+### Curva de aprendizaje
+
+Media. Hay que entender estado, nodos, edges, reducers y configuracion por
+`thread_id`, pero el flujo es visible y depurable.
+
+### Capacidades observadas
+
+- Tool use: si, mediante `@tool` y `bind_tools`.
+- Memoria: si, corto plazo con `InMemorySaver`.
+- Multiagente: posible mediante subgraphs, aun no implementado en este demo.
+- HITL: si, mediante `interrupt` y `Command(resume=...)`.
+- Observabilidad: el grafo se puede inspeccionar y conectar con LangSmith; no se
+  configura una cuenta de observabilidad en este prototipo.
+
+### Costo
+
+LangGraph se instala como paquete Python. El costo real del quickstart es el
+consumo del proveedor de modelo; Gemini puede ofrecer nivel gratuito con cuotas
+y limites. La persistencia administrada y la observabilidad pueden agregar
+costos según el servicio elegido.
+
+### Riesgo principal
+
+La complejidad aumenta cuando crecen los estados, ciclos y proveedores. Si no se
+definen contratos de estado y limites de reintentos, el grafo puede ser difícil
+de mantener.
+
+### Recomendacion
+
+**Si**, cuando se necesita control explicito del flujo, memoria, aprobaciones o
+recuperacion. **Depende** si el caso solo requiere una cadena lineal sencilla.
+
+### Evidencia de uso
+
+Conserva una captura de la terminal con el quickstart ejecutado, el prompt de
+aprobacion HITL y la respuesta `yes` o `no`. Registra tambien el primer error
+real y como se resolvio. La suite de pruebas locales aporta evidencia
+reproducible sin consumir API.
+
+## Limitaciones y riesgos tecnicos
+
+- `InMemorySaver` pierde datos al reiniciar.
+- Gemini depende de internet, cuota y disponibilidad del modelo.
+- HITL reduce el riesgo de una division no autorizada, pero no sustituye
+  validacion de negocio.
+- No se deben guardar secretos, datos sensibles ni historiales reales en este
+  prototipo sin controles adicionales.
 
 ## Fuentes oficiales
 
-- Quickstart: https://docs.langchain.com/oss/python/langgraph/quickstart
-- Integracion Gemini: https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai
-- API de Gemini: https://ai.google.dev/gemini-api/docs/quickstart# langgraph-agent-quickstart
+- [LangGraph quickstart](https://docs.langchain.com/oss/python/langgraph/quickstart)
+- [LangGraph memory](https://docs.langchain.com/oss/python/langgraph/add-memory)
+- [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
+- [LangChain Gemini integration](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai)
+- [Gemini API quickstart](https://ai.google.dev/gemini-api/docs/quickstart)
