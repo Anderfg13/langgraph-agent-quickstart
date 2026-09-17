@@ -1,3 +1,5 @@
+"""Punto de entrada para ejecutar el demo interactivo del agente."""
+
 from langchain.messages import HumanMessage
 from langgraph.types import Command
 
@@ -5,6 +7,12 @@ from app.graph import build_agent
 
 
 def run_demo():
+    """Ejecuta una conversacion de suma y division con aprobacion HITL.
+
+    La primera consulta demuestra continuidad de memoria. La segunda provoca
+    una interrupcion antes de dividir y solicita al usuario una respuesta.
+    """
+
     agent = build_agent()
     config = {"configurable": {"thread_id": "demo-gemini"}}
 

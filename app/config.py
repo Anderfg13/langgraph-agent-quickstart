@@ -1,3 +1,5 @@
+"""Configuracion del modelo de lenguaje usado por el agente."""
+
 import os
 
 from dotenv import load_dotenv
@@ -12,6 +14,7 @@ if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GEMINI_API_KEY"):
     )
 
 
+"""Modelo Gemini configurado para responder de forma determinista."""
 model = init_chat_model(
     "gemini-2.5-flash",
     model_provider="google_genai",

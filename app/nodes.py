@@ -1,3 +1,5 @@
+"""Nodos y reglas de enrutamiento del agente aritmetico."""
+
 from typing import Literal
 
 from langchain.messages import SystemMessage, ToolMessage
@@ -13,6 +15,16 @@ model_with_tools = model.bind_tools(tools)
 
 
 def llm_call(state: MessagesState):
+    """Invoca Gemini con el historial y las herramientas disponibles.
+
+    Args:
+        state: Estado actual del grafo, incluyendo el historial de mensajes.
+
+    Returns:
+        Actualizacion del estado con la respuesta del modelo y el contador de
+        llamadas incrementado.
+    """
+
     return {
         "messages": [
             model_with_tools.invoke(
@@ -32,6 +44,19 @@ def llm_call(state: MessagesState):
 
 
 def tool_node(state: MessagesState):
+    """Ejecuta las herramientas solicitadas por el ultimo mensaje del modelo.
+
+    Las divisiones requieren aprobacion humana mediante `interrupt`. Los
+    errores de argumentos o de valores se convierten en `ToolMessage` para que
+    el modelo pueda explicarlos sin terminar todo el grafo.
+
+    Args:
+        state: Estado con el ultimo mensaje del modelo y sus tool calls.
+
+    Returns:
+        Mensajes con los resultados o errores de las herramientas ejecutadas.
+    """
+
     results = []
     for tool_call in state["messages"][-1].tool_calls:
         if tool_call["name"] == "divide":
@@ -64,6 +89,16 @@ def tool_node(state: MessagesState):
 
 
 def should_continue(state: MessagesState) -> Literal["tool_node", END]:
+    """Decide si el grafo debe ejecutar tools o terminar.
+
+    Args:
+        state: Estado actual del grafo.
+
+    Returns:
+        `tool_node` si el modelo solicito una herramienta; `END` en caso
+        contrario.
+    """
+
     if state["messages"][-1].tool_calls:
         return "tool_node"
     return END
