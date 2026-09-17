@@ -16,7 +16,7 @@ if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GEMINI_API_KEY"):
 
 """Modelo Gemini configurado para responder de forma determinista."""
 model = init_chat_model(
-    "gemini-2.5-flash",
+    "gemini-3.6-flash",
     model_provider="google_genai",
     temperature=0,
 )

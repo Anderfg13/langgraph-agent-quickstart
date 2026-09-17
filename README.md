@@ -112,6 +112,10 @@ Cuando la aprobacion es negativa, el estado incluye `halted=True`. Esto evita
 que el modelo vuelva a solicitar automaticamente la misma herramienta despues
 del rechazo.
 
+El nodo `tool_node` tambien tiene una arista condicional: si `halted=True`, va
+directamente a `END`; si no, vuelve a `llm_call` para que el modelo use el
+resultado de la herramienta.
+
 ### Manejo basico de errores
 
 La herramienta `divide` valida el divisor y lanza un `ValueError` si es cero.

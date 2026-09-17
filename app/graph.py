@@ -3,7 +3,7 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from app.nodes import llm_call, should_continue, tool_node
+from app.nodes import after_tool, llm_call, should_continue, tool_node
 from app.state import MessagesState
 
 
@@ -22,7 +22,9 @@ def build_agent():
     agent_builder.add_conditional_edges(
         "llm_call", should_continue, ["tool_node", END]
     )
-    agent_builder.add_edge("tool_node", "llm_call")
+    agent_builder.add_conditional_edges(
+        "tool_node", after_tool, ["llm_call", END]
+    )
 
     checkpointer = InMemorySaver()
     return agent_builder.compile(checkpointer=checkpointer)

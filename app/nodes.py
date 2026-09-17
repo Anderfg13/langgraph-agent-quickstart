@@ -102,3 +102,21 @@ def should_continue(state: MessagesState) -> Literal["tool_node", END]:
     if not state.get("halted", False) and state["messages"][-1].tool_calls:
         return "tool_node"
     return END
+
+
+def after_tool(state: MessagesState) -> Literal["llm_call", END]:
+    """Decide si el grafo vuelve al modelo despues de ejecutar una tool.
+
+    Un rechazo HITL marca el estado como detenido. En ese caso no se vuelve a
+    llamar al modelo, porque podria intentar repetir la operacion rechazada.
+
+    Args:
+        state: Estado actualizado por `tool_node`.
+
+    Returns:
+        `END` si el flujo fue detenido; `llm_call` en cualquier otro caso.
+    """
+
+    if state.get("halted", False):
+        return END
+    return "llm_call"
